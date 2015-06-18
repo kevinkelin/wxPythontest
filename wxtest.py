@@ -1,6 +1,41 @@
 #coding:utf-8
 import wx
 import optparse
+import time
+import threading
+#线程函数
+class FuncThread(threading.Thread):
+    def __init__(self, func, *params, **paramMap):
+        threading.Thread.__init__(self)
+        self.func = func
+        self.params = params
+        self.paramMap = paramMap
+        self.rst = None
+        self.finished = False
+
+    def run(self):
+        self.rst = self.func(*self.params, **self.paramMap)
+        self.finished = True
+
+    def getResult(self):
+        return self.rst
+
+    def isFinished(self):
+        return self.finished
+
+def doInThread(func, *params, **paramMap):
+    t_setDaemon = None
+    if 't_setDaemon' in paramMap:
+        t_setDaemon = paramMap['t_setDaemon']
+        del paramMap['t_setDaemon']
+    ft = FuncThread(func, *params, **paramMap)
+    if t_setDaemon != None:
+        ft.setDaemon(t_setDaemon)
+    ft.start()
+    return ft
+
+
+
 
 class Frame(wx.Frame): #Frame 进行初始化
     def __init__(self,title):
@@ -28,6 +63,8 @@ class Frame(wx.Frame): #Frame 进行初始化
 
         #为各自菜单选项绑定事件函数
         self.Bind(wx.EVT_MENU,self.ShowAbout,id = 7001)
+        self.Bind(wx.EVT_MENU,self.wait,id=6001)
+        self.Bind(wx.EVT_MENU,self.nowait,id=6002)
 
 
 
@@ -43,18 +80,31 @@ class Frame(wx.Frame): #Frame 进行初始化
         self.panel = wx.Panel(self)
         boxSizer.Add(self.panel,3,wx.ALL|wx.EXPAND,3)
 
+        #初始化一个textCtrl,StaticText 需要放到一个panel中，也就是上面创建的那个panel
+        self.output = wx.TextCtrl(self.panel,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL, size=(800, 600))
+
     def ShowAbout(self,evt):#事件函数要传一个evt(事件)为参数
     	wx.MessageDialog(self,'wxPython使用介绍','提示',wx.OK|wx.ICON_INFORMATION).ShowModal()
 
-        
+    def wait(self,evt):
+        self.output.AppendText('begin...\r\n')
+        time.sleep(10)
+        self.output.AppendText('end...\r\n')
+
+    def nowait(self,evt):
+        def wait():
+            wx.CallAfter(self.output.AppendText,'begin_noblock...\r\n')
+            time.sleep(10)
+            wx.CallAfter(self.output.AppendText,'end_noblock...\r\n')
+        doInThread(wait)
+
 
 
 class App(wx.App): ##继承wx,App
     def OnInit(self): ##还没有调起来的时候读取初始化
         self.frame = Frame('修改host工具')        
         self.frame.Centre()
-        self.frame.Show(True)
-        
+        self.frame.Show(True)        
         return True
 
 def killSelf(evt = None):
