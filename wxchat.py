@@ -87,7 +87,7 @@ class login(wx.Dialog):
         body=urllib.urlencode({'userId':userid,'pswd':userpass})
         rst = doInThread(autonet.doHttpPost,uri=r"http://pub.releaseoa.corp.qihoo.net:8385/login",body=body)
         while True:
-            if not rst.isFinished:
+            if not rst.isFinished():
                 time.sleep(0.5)
             else:
                 print '11111111'
