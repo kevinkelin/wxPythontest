@@ -45,7 +45,6 @@ class Login(wx.Dialog):
     def __init__(self,NULL,title):
         wx.Dialog.__init__(self,NULL,title=title,size = (300,200))
         
-        
         #初始化两个文本框
         self.useridtext = wx.StaticText(self,-1,"用户ID")
         self.passtext = wx.StaticText(self,-1,"密码")
@@ -114,16 +113,14 @@ class Login(wx.Dialog):
                 else:
                     self.info.SetLabel(u'登录成功，seession是'+result['data']['session'])
                     time.sleep(1)
-                    # self.user.userid = userid
-                    # self.user.islogin= 1
-                    # self.user.sesseion = result['data']['session']
+                    user = User(userid,1,result['data']['session'])
                     self.Destroy()
-                    # return self.user
+                    return user
                     
 
     def startReg(self,evt):
         self.Show(False)
-        regDig = Reg(self,title="注册系统")        
+        regDig = Reg(self,title="登录系统")        
         regDig.Show()
         
     def exit(self,evt):
@@ -204,29 +201,105 @@ class Frame(wx.Frame): #Frame 进行初始化
         #将menuBar设置到menu上
         self.SetMenuBar(menuBar)
 
-        #在界面赐初始化一个盒模型
+        #在界面初始化一个盒模型
         boxSizer = wx.BoxSizer(wx.VERTICAL)
         #在主界面初始化一个panel
-        self.panel = wx.Panel(self)
+        # self.panel = wx.Panel(self)
         #在panel上添加一个textCtrl
-        self.infobox = wx.TextCtrl(self.panel,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL,size=(300,400))
-        boxSizer.Add(self.panel,3,wx.ALL | wx.EXPAND, 3)
+        # self.infobox = wx.TextCtrl(self,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL,size=(300,400))
+        #初始化一个主窗口
+        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+        
+        #初始化两个文本框
+        self.useridtext = wx.StaticText(self,-1,"用户ID")
+        self.passtext = wx.StaticText(self,-1,"密码")
+        self.userid = wx.TextCtrl(self,-1,'',style=wx.TE_LEFT)
+        self.password = wx.TextCtrl(self,-1,'',style=wx.TE_PASSWORD)
+        self.passtext2 = wx.StaticText(self,-1,"重复密码")        
+        self.password2 = wx.TextCtrl(self,-1,'',style=wx.TE_PASSWORD) 
+        
+        self.useridSizer = wx.BoxSizer(wx.HORIZONTAL)        
+        self.useridSizer.Add(self.useridtext,1)
+        self.useridSizer.Add(self.userid,2)
+
+        self.passSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.passSizer.Add(self.passtext,1)
+        self.passSizer.Add(self.password,2)
+        
+        self.passSizer2 = wx.BoxSizer(wx.HORIZONTAL)              
+        self.passSizer2.Add(self.passtext2,1)
+        self.passSizer2.Add(self.password2,2)
+        
+        #初始化三个按钮
+        self.loginBtn = wx.Button(self,-1,"登录")
+        self.Bind(wx.EVT_BUTTON,self.loginuser,self.loginBtn)
+        self.regBtn = wx.Button(self,-1,"注册")
+        self.Bind(wx.EVT_BUTTON,self.startReg,self.regBtn)
+        self.cancelBtn = wx.Button(self,-1,"退出")
+        self.Bind(wx.EVT_BUTTON,self.exit,self.cancelBtn) 
+        
+        self.btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.btnSizer.Add(self.loginBtn)
+        self.btnSizer.Add(self.regBtn)
+        self.btnSizer.Add(self.cancelBtn)        
+
+        # self.mainSizer.Add((-1,20)) mainsizer
+        self.mainSizer.Add(self.useridSizer,2)
+        self.mainSizer.Add(self.passSizer,2)
+        self.mainSizer.Add(self.passSizer2,2)
+        self.passSizer2.Hide(self.passtext2)
+        self.passSizer2.Hide(self.password2)
+        self.mainSizer.Add(self.btnSizer,1)
+        
+        # boxSizer.Add(self.infobox,3)
+        boxSizer.Add(self.mainSizer,1)
+        
 
     def startLogin(self,evt):
-        self.infobox.WriteText('start login...')        
-        logDig = Login(self,'登录系统')        
-        logDig.Show()
-        # print user
-        # if user:
-            # self.infobox.WriteText("user的信息是。。。")
-        # else:
-            # self.infobox.WriteText("...")
+        self.infobox.WriteText('start login...')
+        logDig = Login(self,'登录系统')
+        user = logDig.Show()
+        print user
+        if user:
+            self.infobox.WriteText("user的信息是。。。")
+        else:
+            self.infobox.WriteText("...")
         
     def startreg(self,evt):
         self.infobox.WriteText('开始注册。。。')
         regDig = Reg(self)
         regDig.Show()
         
+        
+    def loginuser(self,evt):
+        userid = self.userid.GetValue()
+        userpass = self.password.GetValue()
+        self.info.SetLabel(u'正在以'+userid+u'的身份登录...')
+        body=urllib.urlencode({'userId':userid,'pswd':userpass})
+        rst = doInThread(autonet.doHttpPost,uri=r"http://pub.releaseoa.corp.qihoo.net:8385/login",body=body)
+        while True:
+            if not rst.isFinished():
+                time.sleep(0.5)
+            else:                
+                status,headers,contents =  rst.getResult()
+                result = json.loads(contents)
+                if result['err'] !=0:
+                    self.info.SetLabel(result['msg'])
+                else:
+                    self.info.SetLabel(u'登录成功，seession是'+result['data']['session'])
+                    time.sleep(1)
+                    user = User(userid,1,result['data']['session'])
+                    self.Destroy()
+                    return user
+                    
+
+    def startReg(self,evt):
+        self.Show(False)
+        regDig = Reg(self,title="登录系统")        
+        regDig.Show()
+        
+    def exit(self,evt):
+        self.Destroy()
 
   
 class App(wx.App): ##继承wx.App
