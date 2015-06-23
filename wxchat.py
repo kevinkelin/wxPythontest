@@ -35,15 +35,16 @@ def doInThread(func, *params, **paramMap):
 
 #用户类
 class User():
-    def __init__(self,userid,islogin,session):        
+    def __init__(self,userid="",islogin=0,session=""):        
         self.userid = userid
         self.islogin = islogin
         self.session = session
     
     
 class Login(wx.Dialog):
-    def __init__(self,NULL,title):
+    def __init__(self,NULL,title,user=None):
         wx.Dialog.__init__(self,NULL,title=title,size = (300,200))
+        self.user = user
         
         
         #初始化两个文本框
@@ -111,27 +112,32 @@ class Login(wx.Dialog):
                 result = json.loads(contents)
                 if result['err'] !=0:
                     self.info.SetLabel(result['msg'])
+                    break
                 else:
-                    self.info.SetLabel(u'登录成功，seession是'+result['data']['session'])
+                    session =  result['data']['session']                                   
+                    self.info.SetLabel(u'登录成功，seession是'+session)
                     time.sleep(1)
-                    # self.user.userid = userid
-                    # self.user.islogin= 1
-                    # self.user.sesseion = result['data']['session']
+                    print type(userid)
+                    self.user.userid = userid
+                    self.user.islogin= 1                   
+                    self.user.session = session
                     self.Destroy()
-                    # return self.user
+                    return self.user
                     
 
     def startReg(self,evt):
         self.Show(False)
-        regDig = Reg(self,title="注册系统")        
+        self.user = User()
+        regDig = Reg(self,title="注册系统",user = self.user)        
         regDig.Show()
         
     def exit(self,evt):
         self.Destroy()
     
 class Reg(Login):
-    def __init__(self,Null,title='注册系统'):
-        Login.__init__(self,Null,title)
+    def __init__(self,Null,title='注册系统',user=None):
+        Login.__init__(self,Null,title,user)
+        # self.user = user
         self.passSizer2.Show(self.passtext2)
         self.passSizer2.Show(self.password2)
         
@@ -159,7 +165,8 @@ class Reg(Login):
                 status,headers,contents =  rst.getResult()
                 newuser = json.loads(contents)
                 self.info.SetLabel("注册成功,你得到的ID是:"+str(newuser['data']['userId'])+',请点击退出后登录')
-                break
+                self.user.userid = newuser['data']['userId']                
+                return self.user
             
     def exit(self,evt):
         self.Show(False)
@@ -170,7 +177,8 @@ class Reg(Login):
 
 class Frame(wx.Frame): #Frame 进行初始化
     def __init__(self,title):
-        wx.Frame.__init__(self,None,title=title,size = (300,600))       
+        wx.Frame.__init__(self,None,title=title,size = (300,600))
+        self.user = User()
 
         #初始化一个菜单栏
         menuBar = wx.MenuBar() 
@@ -204,28 +212,94 @@ class Frame(wx.Frame): #Frame 进行初始化
         #将menuBar设置到menu上
         self.SetMenuBar(menuBar)
 
-        #在界面赐初始化一个盒模型
-        boxSizer = wx.BoxSizer(wx.VERTICAL)
+        #在界面初始化一个盒模型
+        self.boxSizer = wx.BoxSizer(wx.VERTICAL)
         #在主界面初始化一个panel
         self.panel = wx.Panel(self)
         #在panel上添加一个textCtrl
-        self.infobox = wx.TextCtrl(self.panel,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL,size=(300,400))
-        boxSizer.Add(self.panel,3,wx.ALL | wx.EXPAND, 3)
+        self.infobox = wx.TextCtrl(self.panel,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL,size=(300,200))
+        self.boxSizer.Add(self.panel,1,wx.ALL | wx.EXPAND, 3)        
+        self.SetSizer(self.boxSizer)
 
     def startLogin(self,evt):
         self.infobox.WriteText('start login...')        
-        logDig = Login(self,'登录系统')        
-        logDig.Show()
-        # print user
-        # if user:
-            # self.infobox.WriteText("user的信息是。。。")
-        # else:
-            # self.infobox.WriteText("...")
+        logDig = Login(self,'登录系统',user=self.user)        
+        logDig.ShowModal()
+        self.infobox.AppendText('\r')
+        self.infobox.AppendText(self.user.userid+'\r\n')
+        self.infobox.AppendText(str(self.user.islogin)+'\r\n')
+        self.infobox.AppendText(self.user.session+'\r\n')
+        self.listUser(self.user)
         
+    def listUser(self,user):
+        userid = user.userid
+        session = user.session
+        body=urllib.urlencode({'userId':userid,'session':session})
+        rst = doInThread(autonet.doHttpPost,uri=r"http://pub.releaseoa.corp.qihoo.net:8385/userList",body=body)
+        self.tree = wx.TreeCtrl(self.panel,size=(300,500))
+        alluser = self.tree.AddRoot(u'用户')
+        onlineitem = self.tree.AppendItem(alluser,u'在线')
+        offlineitem = self.tree.AppendItem(alluser,u'不在线')
+        
+        # self.online = wx.TreeCtrl(self.tree,-1)
+        
+        # self.offline = wx.TreeCtrl(self.tree,-1)
+        
+        
+        
+        # offlineId = self.tree.AddRoot(u'离线')
+        while True:
+            if not rst.isFinished():
+                time.sleep(0.5)
+            else:                
+                status,headers,contents =  rst.getResult()
+                userlist = json.loads(contents)['data']['userInfoList']
+                online = []
+                offline = []
+                self.userbtn = wx.BoxSizer(wx.VERTICAL)
+                for user in userlist:
+                    print user
+                    if user.get(u'status') == 1:
+                        online.append(user)
+                    else:
+                        offline.append(user)
+                        
+                for user in online:
+                    uid = str(user.get(u'userId'))
+                    username = user.get(u'user')                    
+                    itemid = self.tree.AppendItem(onlineitem,username)
+                    print self.tree.GetItemText(itemid)
+                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(onlineitem))
+                    
+                for user in offline:
+                    uid = str(user.get(u'userId'))
+                    username = user.get(u'user')
+                    itemid = self.tree.AppendItem(offlineitem,username)
+                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(offlineitem))
+                
+                self.tree.Expand(onlineitem)   
+                # self.tree.Expand(offline)   
+                    # buttonname = 'user'+str(user.get(u'userId'))
+                    # buttondisplay = user.get(u'user')
+                    
+                    # self.buttonname = wx.Button(self,-1,buttondisplay)
+                    # self.userbtn.Add(self.buttonname)
+                self.infobox.Hide()
+                self.boxSizer.Add(self.tree,3)
+                break
+        
+      
     def startreg(self,evt):
         self.infobox.WriteText('开始注册。。。')
-        regDig = Reg(self)
-        regDig.Show()
+        regDig = Reg(self,'注册系统',self.user)
+        regDig.ShowModal()
+        self.infobox.WriteText(user.userid+r'\r\n')
+        self.infobox.WriteText(user.islogin+r'\r\n')
+        self.infobox.WriteText(user.session+r'\r\n')
+        
+    def showSendMessage(self,evt,mark):
+        wx.MessageDialog(self, mark, 'test2', wx.OK | wx.ICON_INFORMATION).ShowModal()
+        
         
 
   
