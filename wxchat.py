@@ -241,12 +241,6 @@ class Frame(wx.Frame): #Frame 进行初始化
         onlineitem = self.tree.AppendItem(alluser,u'在线')
         offlineitem = self.tree.AppendItem(alluser,u'不在线')
         
-        # self.online = wx.TreeCtrl(self.tree,-1)
-        
-        # self.offline = wx.TreeCtrl(self.tree,-1)
-        
-        
-        
         # offlineId = self.tree.AddRoot(u'离线')
         while True:
             if not rst.isFinished():
@@ -257,8 +251,7 @@ class Frame(wx.Frame): #Frame 进行初始化
                 online = []
                 offline = []
                 self.userbtn = wx.BoxSizer(wx.VERTICAL)
-                for user in userlist:
-                    print user
+                for user in userlist:                    
                     if user.get(u'status') == 1:
                         online.append(user)
                     else:
@@ -266,24 +259,20 @@ class Frame(wx.Frame): #Frame 进行初始化
                         
                 for user in online:
                     uid = str(user.get(u'userId'))
-                    username = user.get(u'user')                    
-                    itemid = self.tree.AppendItem(onlineitem,username)
-                    print self.tree.GetItemText(itemid)
-                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(onlineitem))
+                    username = uid+':'+user.get(u'user')                    
+                    itemid = self.tree.AppendItem(onlineitem,username)                    
+                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
+                    # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(onlineitem))
                     
                 for user in offline:
                     uid = str(user.get(u'userId'))
-                    username = user.get(u'user')
+                    username = uid+':'+ user.get(u'user')
                     itemid = self.tree.AppendItem(offlineitem,username)
-                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(offlineitem))
+                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
+                    # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(offlineitem))
                 
                 self.tree.Expand(onlineitem)   
-                # self.tree.Expand(offline)   
-                    # buttonname = 'user'+str(user.get(u'userId'))
-                    # buttondisplay = user.get(u'user')
-                    
-                    # self.buttonname = wx.Button(self,-1,buttondisplay)
-                    # self.userbtn.Add(self.buttonname)
+                
                 self.infobox.Hide()
                 self.boxSizer.Add(self.tree,3)
                 break
@@ -297,11 +286,32 @@ class Frame(wx.Frame): #Frame 进行初始化
         self.infobox.WriteText(user.islogin+r'\r\n')
         self.infobox.WriteText(user.session+r'\r\n')
         
-    def showSendMessage(self,evt,mark):
-        wx.MessageDialog(self, mark, 'test2', wx.OK | wx.ICON_INFORMATION).ShowModal()
+    def showSendMessage(self,evt):
+        treeitemid = evt.GetItem()
+        itemtext = self.tree.GetItemText(treeitemid)
+        desuid = itemtext.split(":")[0]
+        desuser = itemtext.split(":")[1]
+        # wx.MessageDialog(self, itemtext,'test2', wx.OK | wx.ICON_INFORMATION).ShowModal()
+        title = u'给%s留言'%desuser
+        chatbox = Chatmsg(self,title,self.user,desuid)
+        chatbox.ShowModal()
         
         
-
+class Chatmsg(wx.Dialog):
+    def __init__(self,NULL,title,user=None,desuid=""):
+        wx.Dialog.__init__(self,NULL,title=title,size = (300,200))
+        self.user = user
+        self.boxSizer = wx.BoxSizer(wx.VERTICAL)
+        self.btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.sendBtn = wx.Button(self,-1,u"发送")
+        self.cacelBtn = wx.Button(self,-1,u"退出")
+        self.btnSizer.Add(self.sendBtn)
+        self.btnSizer.Add(self.cacelBtn)
+        self.message = wx.TextCtrl(self,-1,'',style = wx.TE_MULTILINE|wx.HSCROLL,size=(280,150))
+        self.boxSizer.Add(self.message,4)
+        self.boxSizer.Add(self.btnSizer,1)
+        
+        self.SetSizer(self.boxSizer)
   
 class App(wx.App): ##继承wx.App
     def OnInit(self): ##还没有调起来的时候读取初始化
