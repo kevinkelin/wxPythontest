@@ -261,16 +261,17 @@ class Frame(wx.Frame): #Frame 进行初始化
                     uid = str(user.get(u'userId'))
                     username = uid+':'+user.get(u'user')                    
                     itemid = self.tree.AppendItem(onlineitem,username)                    
-                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
+                    # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
                     # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(onlineitem))
                     
                 for user in offline:
                     uid = str(user.get(u'userId'))
                     username = uid+':'+ user.get(u'user')
                     itemid = self.tree.AppendItem(offlineitem,username)
-                    self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
+                    # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
                     # self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,lambda evt,mark =self.tree.GetItemText(itemid): self.showSendMessage(evt,mark),self.tree.GetLastChild(offlineitem))
                 
+                self.Bind(wx.EVT_TREE_ITEM_ACTIVATED,self.showSendMessage)
                 self.tree.Expand(onlineitem)   
                 
                 self.infobox.Hide()
