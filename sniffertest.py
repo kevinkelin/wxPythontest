@@ -3,9 +3,11 @@ import wx
 import optparse
 import time
 import threading
-import os,pcap
+import os,pcap,httpsniffer,re
+
        
-        
+id = 0
+result = []        
 #线程函数
 class FuncThread(threading.Thread):
     def __init__(self, func, *params, **paramMap):
@@ -54,9 +56,9 @@ class Frame(wx.Frame): #Frame 进行初始化
         
         filterText = wx.StaticText(self.panel,-1,'请书写过滤规则')
         hosttext = wx.StaticText(self.panel,-1,'host')
-        hostctrl = wx.TextCtrl(self.panel,-1,size=(150,20))
+        self.hostctrl = wx.TextCtrl(self.panel,-1,size=(150,20))
         uritext = wx.StaticText(self.panel,-1,'uri')
-        urictrl = wx.TextCtrl(self.panel,-1,size=(100,20))
+        self.urictrl = wx.TextCtrl(self.panel,-1,size=(100,20))
         self.startButton = wx.Button(self.panel,-1,'开始')        
         self.stopButton = wx.Button(self.panel,-1,'停止')
         self.stopButton.Disable() #将停止按钮设置为disable
@@ -64,9 +66,9 @@ class Frame(wx.Frame): #Frame 进行初始化
         self.Bind(wx.EVT_BUTTON,self.stop,self.stopButton)
         #书写过滤规则的sizer
         filterSizer.Add(hosttext,0,wx.LEFT|wx.TOP,border=10)
-        filterSizer.Add(hostctrl,0,wx.LEFT|wx.TOP,border=10)
+        filterSizer.Add(self.hostctrl,0,wx.LEFT|wx.TOP,border=10)
         filterSizer.Add(uritext,0,wx.LEFT|wx.TOP,border=10)
-        filterSizer.Add(urictrl,0,wx.LEFT|wx.TOP,border=10)
+        filterSizer.Add(self.urictrl,0,wx.LEFT|wx.TOP,border=10)
         filterSizer.Add(self.startButton,0,wx.LEFT|wx.TOP,border=10)
         filterSizer.Add(self.stopButton,0,wx.LEFT|wx.TOP,border=10)
         
@@ -95,18 +97,24 @@ class Frame(wx.Frame): #Frame 进行初始化
         if item == -1:
             self.message('请选择要抓包的网卡')             
         else:
-            eth = self.ethlist.GetString(item)
+            eth = self.ethlist.GetString(item)            
             self.stopButton.Enable()
             self.startButton.Disable()
             self.exit.Disable()
-            print eth
-            self.insertinfo(['0','www.360.cn','jijiuxiang.html'])            
-            self.insertinfo(['1','www2.360.cn','mygroups?gid=201107190181919446&wvr=6&leftnav=1'])
+            hostfilter = self.hostctrl.GetValue()
+            urifilter = self.urictrl.GetValue()
+            pc = pcap.pcap(eth) #初始化pc
+            filter = r'tcp'
+            pc.setfilter(filter)
+            doInThread(pc.loop,self.process,hostfilter,urifilter)
+            
+            
         
     def stop(self,evt):
         self.stopButton.Disable()
         self.startButton.Enable()
         self.exit.Enable()
+        
         
     def message(self,msg):
         wx.MessageDialog(self,msg, '提示', wx.OK | wx.ICON_INFORMATION).ShowModal()
@@ -114,16 +122,34 @@ class Frame(wx.Frame): #Frame 进行初始化
     def insertinfo(self,data):
         row = self.sniffer.GetItemCount()        
         self.sniffer.InsertStringItem(row,str(row+1))
-        self.sniffer.SetStringItem(row,1,data[1])
-        self.sniffer.SetStringItem(row,2,data[2])
+        self.sniffer.SetStringItem(row,1,data[2])
+        self.sniffer.SetStringItem(row,2,data[3])
     
     def exitpro(self,evt):
-        self.Destroy()
-        
-        
-
-        
-
+        self.Destroy()    
+    
+    def process(self,ts, pkt,hostfilter='',urifilter=''):
+        global id, result        
+        if not hostfilter:
+            hostfilter = r'.*?360.*?'
+        if not urifilter:
+            urifilter = r'.*?'
+        try:
+            h = httpsniffer.HttpHandler()
+            r = h.process(ts, pkt)
+            if r:
+                data = r.getdata()
+                
+                if not data[1]:
+                    return
+                if (re.match(hostfilter,data[1]) and re.match(r'http',data[0],re.I) and re.match(urifilter,data[2])) or urifilter in data[2]:
+                    id += 1
+                    data.insert(0, str(id))
+                    result.append(data)
+                    print data
+                    self.insertinfo(data)              
+        except:
+            pass
   
 class App(wx.App): ##继承wx.App
     def OnInit(self): ##还没有调起来的时候读取初始化
